@@ -18,5 +18,5 @@ export default function App() {
   }, [])
 
   if (!ready) return null
-  return session ? <Board /> : <Login />
+  return session ? <Board session={session} /> : <Login />
 }

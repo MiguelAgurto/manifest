@@ -1,7 +1,8 @@
 # Manifest — work correspondence tracker
 
 A single-user tracker for daily work correspondence and follow-ups. Items are
-captured once and move between buckets — never rewritten, never deleted.
+captured once and move between buckets — never rewritten, and never lost to a
+stray tap: deleting sends an item to Trash, where it can be restored.
 
 ## Buckets
 
@@ -10,6 +11,16 @@ captured once and move between buckets — never rewritten, never deleted.
 - **Standing by** — waiting on a specific person (who + optional chase-by date; flagged overdue once passed)
 - **Parked** — set aside for later (e.g. next voyage)
 - **Closed** — done; kept in history forever
+
+**Trash** is not a bucket but a view of items with `deleted_at` set. They keep
+their original bucket, so restoring puts them back where they were. Purging
+from Trash is the only real delete in the app.
+
+## Tags
+
+Free-form tags live in a `text[]` column on the item (normalized lowercase, no
+`#`). Tags are added from the card with autocomplete from tags already in use,
+and tapping one filters the board.
 
 ## Stack
 
@@ -26,7 +37,9 @@ captured once and move between buckets — never rewritten, never deleted.
 
 `items` — one row per item: `title`, `notes`, `bucket`
 (`inbound | in_hand | standing_by | parked | closed`), `waiting_on`,
-`chase_by`, timestamps. No deletes.
+`chase_by`, `tags`, timestamps, `deleted_at`. Deleting is an update that stamps
+`deleted_at`; a hard delete only happens on an explicit purge from Trash, which
+cascades that item's events out with it.
 
 `item_events` — append-only log of every bucket move
 (`item_id`, `from_bucket`, `to_bucket`, `at`).

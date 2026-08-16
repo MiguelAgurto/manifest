@@ -8,15 +8,17 @@ create table if not exists items (
               check (bucket in ('inbound','in_hand','standing_by','parked','closed')),
   waiting_on  text,          -- who we're waiting on (standing_by)
   chase_by    date,          -- optional chase date (standing_by)
+  tags        text[] not null default '{}',
   created_at  timestamptz not null default now(),
   updated_at  timestamptz not null default now(),
   closed_at   timestamptz,
+  deleted_at  timestamptz,  -- soft delete; row survives in the Trash view
   user_id     uuid not null references auth.users (id) default auth.uid()
 );
 
 create table if not exists item_events (
   id          bigint generated always as identity primary key,
-  item_id     uuid not null references items(id),
+  item_id     uuid not null references items(id) on delete cascade,
   from_bucket text,
   to_bucket   text not null,
   note        text,
@@ -25,15 +27,20 @@ create table if not exists item_events (
 );
 
 create index if not exists items_bucket_idx on items (bucket);
+create index if not exists items_tags_idx on items using gin (tags);
+create index if not exists items_deleted_at_idx on items (deleted_at);
 create index if not exists item_events_item_idx on item_events (item_id);
 
 alter table items enable row level security;
 alter table item_events enable row level security;
 
 -- Rows are scoped to their owner via user_id (stamped by default auth.uid()).
--- No delete policy on items — closed items are permanent history.
+-- Deleting is a two-step road: the UI only ever sets deleted_at (an update),
+-- moving the item to Trash. A real delete happens only on an explicit purge
+-- from there, which cascades the item's events out with it.
 create policy "own items read"    on items       for select to authenticated using (user_id = auth.uid());
 create policy "own items insert"  on items       for insert to authenticated with check (user_id = auth.uid());
 create policy "own items update"  on items       for update to authenticated using (user_id = auth.uid()) with check (user_id = auth.uid());
+create policy "own items delete"  on items       for delete to authenticated using (user_id = auth.uid());
 create policy "own events read"   on item_events for select to authenticated using (user_id = auth.uid());
 create policy "own events insert" on item_events for insert to authenticated with check (user_id = auth.uid());

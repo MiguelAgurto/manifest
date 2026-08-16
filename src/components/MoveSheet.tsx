@@ -14,7 +14,7 @@ export default function MoveSheet({ item, onConfirm, onCancel }: Props) {
   return (
     <div className="sheet-backdrop" onClick={onCancel}>
       <div className="sheet" onClick={(e) => e.stopPropagation()}>
-        <h2>Standing by</h2>
+        <h2>⏳ Standing by</h2>
         <p className="sheet-item">{item.title}</p>
         <label>
           Waiting on

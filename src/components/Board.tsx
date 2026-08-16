@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import type { Session } from '@supabase/supabase-js'
 import { supabase } from '../lib/supabase'
 import {
   enqueueCapture,
@@ -7,19 +8,40 @@ import {
   loadSnapshot,
   saveSnapshot,
 } from '../lib/offline'
-import type { Bucket, Item } from '../types'
-import { BUCKETS, BUCKET_LABELS, isOverdue } from '../types'
+import type { Bucket, Item, Tab } from '../types'
+import {
+  TABS,
+  TAB_EMOJI,
+  TAB_LABELS,
+  displayName,
+  isOverdue,
+  normalizeTag,
+} from '../types'
 import ItemCard from './ItemCard'
 import MoveSheet from './MoveSheet'
 
-export default function Board() {
+function greeting(date = new Date()): string {
+  const h = date.getHours()
+  if (h < 12) return 'Good morning'
+  if (h < 18) return 'Good afternoon'
+  return 'Good evening'
+}
+
+interface Props {
+  session: Session
+}
+
+export default function Board({ session }: Props) {
   const [items, setItems] = useState<Item[]>(loadSnapshot)
   const [queued, setQueued] = useState(loadQueue)
-  const [tab, setTab] = useState<Bucket>('inbound')
+  const [tab, setTab] = useState<Tab>('inbound')
   const [online, setOnline] = useState(navigator.onLine)
   const [capture, setCapture] = useState('')
   const [search, setSearch] = useState('')
+  const [tagFilter, setTagFilter] = useState<string | null>(null)
   const [moving, setMoving] = useState<Item | null>(null) // item picking a standing_by target
+
+  const name = displayName(session.user.email, session.user.user_metadata?.name)
 
   const refresh = useCallback(async () => {
     await flushQueue()
@@ -49,6 +71,30 @@ export default function Board() {
     }
   }, [refresh])
 
+  /** Apply a patch to one row, both remotely and in the local snapshot. */
+  const patchItem = useCallback(
+    async (item: Item, patch: Partial<Item>, failLabel: string) => {
+      const { error } = await supabase.from('items').update(patch).eq('id', item.id)
+      if (error) {
+        alert(`${failLabel} failed: ${error.message}`)
+        return false
+      }
+      setItems((prev) => {
+        const next = prev.map((i) => (i.id === item.id ? { ...i, ...patch } : i))
+        saveSnapshot(next)
+        return next
+      })
+      return true
+    },
+    [],
+  )
+
+  function requireOnline(action: string): boolean {
+    if (online) return true
+    alert(`${action} needs a connection — try again when back online.`)
+    return false
+  }
+
   async function addCapture(title: string) {
     const trimmed = title.trim()
     if (!trimmed) return
@@ -76,10 +122,7 @@ export default function Board() {
     to: Bucket,
     extra: { waiting_on?: string | null; chase_by?: string | null } = {},
   ) {
-    if (!online) {
-      alert('Moves need a connection — try again when back online.')
-      return
-    }
+    if (!requireOnline('Moves')) return
     const now = new Date().toISOString()
     const patch = {
       bucket: to,
@@ -88,38 +131,79 @@ export default function Board() {
       closed_at: to === 'closed' ? now : null,
       updated_at: now,
     }
-    const { error } = await supabase.from('items').update(patch).eq('id', item.id)
-    if (error) {
-      alert(`Move failed: ${error.message}`)
-      return
-    }
+    if (!(await patchItem(item, patch, 'Move'))) return
     await supabase
       .from('item_events')
       .insert({ item_id: item.id, from_bucket: item.bucket, to_bucket: to })
-    setItems((prev) => {
-      const next = prev.map((i) => (i.id === item.id ? { ...i, ...patch } : i))
-      saveSnapshot(next)
-      return next
-    })
   }
 
   async function saveNotes(item: Item, notes: string) {
-    const patch = { notes: notes.trim() || null, updated_at: new Date().toISOString() }
-    const { error } = await supabase.from('items').update(patch).eq('id', item.id)
+    if (!requireOnline('Saving notes')) return
+    await patchItem(
+      item,
+      { notes: notes.trim() || null, updated_at: new Date().toISOString() },
+      'Save',
+    )
+  }
+
+  async function setTags(item: Item, tags: string[]) {
+    if (!requireOnline('Editing tags')) return
+    await patchItem(item, { tags, updated_at: new Date().toISOString() }, 'Tag')
+  }
+
+  /** Soft delete — the row and its history stay, it just moves to Trash. */
+  async function trashItem(item: Item) {
+    if (!requireOnline('Deleting')) return
+    await patchItem(
+      item,
+      { deleted_at: new Date().toISOString(), updated_at: new Date().toISOString() },
+      'Delete',
+    )
+  }
+
+  async function restoreItem(item: Item) {
+    if (!requireOnline('Restoring')) return
+    await patchItem(
+      item,
+      { deleted_at: null, updated_at: new Date().toISOString() },
+      'Restore',
+    )
+  }
+
+  /** The only real delete in the app — gone for good, events cascade out. */
+  async function purgeItem(item: Item) {
+    if (!requireOnline('Purging')) return
+    if (!confirm(`Delete "${item.title}" for good? This can't be undone.`)) return
+    const { error } = await supabase.from('items').delete().eq('id', item.id)
     if (error) {
-      alert(`Save failed: ${error.message}`)
+      alert(`Purge failed: ${error.message}`)
       return
     }
     setItems((prev) => {
-      const next = prev.map((i) => (i.id === item.id ? { ...i, ...patch } : i))
+      const next = prev.filter((i) => i.id !== item.id)
       saveSnapshot(next)
       return next
     })
   }
 
+  const live = useMemo(() => items.filter((i) => !i.deleted_at), [items])
+
+  /** Every tag in use, most-used first — powers the filter strip and suggestions. */
+  const allTags = useMemo(() => {
+    const counts = new Map<string, number>()
+    for (const i of live) for (const t of i.tags ?? []) counts.set(t, (counts.get(t) ?? 0) + 1)
+    return [...counts.entries()].sort((a, b) => b[1] - a[1]).map(([t]) => t)
+  }, [live])
+
   const visible = useMemo(() => {
-    let list = items.filter((i) => i.bucket === tab)
-    if (tab === 'closed' && search.trim()) {
+    let list =
+      tab === 'trash'
+        ? items.filter((i) => i.deleted_at)
+        : live.filter((i) => i.bucket === tab)
+
+    if (tagFilter) list = list.filter((i) => (i.tags ?? []).includes(tagFilter))
+
+    if ((tab === 'closed' || tab === 'trash') && search.trim()) {
       const q = search.trim().toLowerCase()
       list = list.filter(
         (i) =>
@@ -135,19 +219,35 @@ export default function Board() {
       })
     }
     return list
-  }, [items, tab, search])
+  }, [items, live, tab, search, tagFilter])
 
   const counts = useMemo(() => {
-    const c = Object.fromEntries(BUCKETS.map((b) => [b, 0])) as Record<Bucket, number>
-    for (const i of items) c[i.bucket]++
+    const c = Object.fromEntries(TABS.map((t) => [t, 0])) as Record<Tab, number>
+    for (const i of items) {
+      if (i.deleted_at) c.trash++
+      else c[i.bucket]++
+    }
     c.inbound += queued.length
     return c
   }, [items, queued])
 
+  const overdueCount = useMemo(() => live.filter((i) => isOverdue(i)).length, [live])
+
   return (
     <div className="board">
       <header>
-        <span className="brand">Manifest</span>
+        <div className="hello">
+          <span className="hello-greeting">
+            {greeting()}, {name}
+          </span>
+          <span className="hello-sub">
+            {overdueCount > 0
+              ? `⏳ ${overdueCount} overdue`
+              : counts.in_hand > 0
+                ? `⚡ ${counts.in_hand} in hand`
+                : '✨ all clear'}
+          </span>
+        </div>
         {!online && <span className="pill offline-pill">offline</span>}
         {queued.length > 0 && (
           <span className="pill queue-pill">{queued.length} queued</span>
@@ -174,22 +274,42 @@ export default function Board() {
       </form>
 
       <nav className="tabs">
-        {BUCKETS.map((b) => (
+        {TABS.map((t) => (
           <button
-            key={b}
-            className={b === tab ? 'tab active' : 'tab'}
-            onClick={() => setTab(b)}
+            key={t}
+            className={t === tab ? 'tab active' : 'tab'}
+            onClick={() => setTab(t)}
           >
-            {BUCKET_LABELS[b]}
-            {counts[b] > 0 && <span className="count">{counts[b]}</span>}
+            <span className="tab-emoji">{TAB_EMOJI[t]}</span>
+            {TAB_LABELS[t]}
+            {counts[t] > 0 && <span className="count">{counts[t]}</span>}
           </button>
         ))}
       </nav>
 
-      {tab === 'closed' && (
+      {allTags.length > 0 && (
+        <div className="tag-filter">
+          {allTags.map((t) => (
+            <button
+              key={t}
+              className={t === tagFilter ? 'tag-chip active' : 'tag-chip'}
+              onClick={() => setTagFilter(t === tagFilter ? null : t)}
+            >
+              #{t}
+            </button>
+          ))}
+          {tagFilter && (
+            <button className="tag-chip clear" onClick={() => setTagFilter(null)}>
+              clear
+            </button>
+          )}
+        </div>
+      )}
+
+      {(tab === 'closed' || tab === 'trash') && (
         <input
           className="search"
-          placeholder="Search history…"
+          placeholder={tab === 'trash' ? 'Search trash…' : 'Search history…'}
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
@@ -207,14 +327,22 @@ export default function Board() {
           <ItemCard
             key={item.id}
             item={item}
-            onMove={(to) =>
-              to === 'standing_by' ? setMoving(item) : moveItem(item, to)
-            }
+            suggestions={allTags}
+            onMove={(to) => (to === 'standing_by' ? setMoving(item) : moveItem(item, to))}
             onSaveNotes={(notes) => saveNotes(item, notes)}
+            onSetTags={(tags) => setTags(item, tags)}
+            onTagClick={(t) => setTagFilter(t === tagFilter ? null : normalizeTag(t))}
+            onTrash={() => trashItem(item)}
+            onRestore={() => restoreItem(item)}
+            onPurge={() => purgeItem(item)}
           />
         ))}
-        {visible.length === 0 && queued.length === 0 && (
-          <p className="empty">Nothing here.</p>
+        {visible.length === 0 && (tab !== 'inbound' || queued.length === 0) && (
+          <p className="empty">
+            {TAB_EMOJI[tab]}
+            <br />
+            {tagFilter ? `Nothing tagged #${tagFilter} here.` : 'Nothing here.'}
+          </p>
         )}
       </main>
 
