@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import type { Bucket, Item } from '../types'
-import { BUCKETS, BUCKET_LABELS, TAB_EMOJI, isOverdue, normalizeTag } from '../types'
+import { BUCKETS, TAB_EMOJI, TAB_LABELS, isOverdue, normalizeTag } from '../types'
 
 function age(iso: string): string {
   const days = Math.floor((Date.now() - new Date(iso).getTime()) / 86_400_000)
@@ -68,7 +68,7 @@ export default function ItemCard({
           )}
           {trashed && item.deleted_at && (
             <span>
-              · from {TAB_EMOJI[item.bucket]} {BUCKET_LABELS[item.bucket]}
+              · from {TAB_EMOJI[item.bucket]} {TAB_LABELS[item.bucket]}
             </span>
           )}
         </div>
@@ -155,7 +155,7 @@ export default function ItemCard({
               <div className="move-row">
                 {BUCKETS.filter((b) => b !== item.bucket).map((b) => (
                   <button key={b} className="move-btn" onClick={() => onMove(b)}>
-                    {TAB_EMOJI[b]} {BUCKET_LABELS[b]}
+                    {TAB_EMOJI[b]} {TAB_LABELS[b]}
                   </button>
                 ))}
                 <button className="move-btn danger-btn" onClick={onTrash}>

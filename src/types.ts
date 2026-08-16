@@ -39,15 +39,6 @@ export const TAB_EMOJI: Record<Tab, string> = {
   trash: '🗑️',
 }
 
-/** Kept for the move buttons, which only ever target real buckets. */
-export const BUCKET_LABELS: Record<Bucket, string> = {
-  inbound: TAB_LABELS.inbound,
-  in_hand: TAB_LABELS.in_hand,
-  standing_by: TAB_LABELS.standing_by,
-  parked: TAB_LABELS.parked,
-  closed: TAB_LABELS.closed,
-}
-
 export function isOverdue(item: Item, today = new Date()): boolean {
   if (item.bucket !== 'standing_by' || !item.chase_by) return false
   const d = new Date(item.chase_by + 'T23:59:59')

@@ -44,3 +44,10 @@ create policy "own items update"  on items       for update to authenticated usi
 create policy "own items delete"  on items       for delete to authenticated using (user_id = auth.uid());
 create policy "own events read"   on item_events for select to authenticated using (user_id = auth.uid());
 create policy "own events insert" on item_events for insert to authenticated with check (user_id = auth.uid());
+
+-- Housekeeping, not part of the Manifest schema: the database also carries a
+-- SECURITY DEFINER function `public.rls_auto_enable()` that something else
+-- created. Its execute grant was revoked to silence a linter warning:
+--   revoke execute on function public.rls_auto_enable() from public, anon, authenticated;
+-- If you don't recognize it, `drop function if exists public.rls_auto_enable() cascade;`
+-- is safe as far as Manifest is concerned.
