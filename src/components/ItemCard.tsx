@@ -1,6 +1,16 @@
 import { useState } from 'react'
-import type { Bucket, Item } from '../types'
-import { BUCKETS, TAB_EMOJI, TAB_LABELS, isOverdue, normalizeTag } from '../types'
+import type { Bucket, Item, Priority } from '../types'
+import {
+  BUCKETS,
+  NORMAL,
+  PRIORITIES,
+  PRIORITY_EMOJI,
+  PRIORITY_LABELS,
+  TAB_EMOJI,
+  TAB_LABELS,
+  isOverdue,
+  normalizeTag,
+} from '../types'
 
 function age(iso: string): string {
   const days = Math.floor((Date.now() - new Date(iso).getTime()) / 86_400_000)
@@ -15,6 +25,7 @@ interface Props {
   onMove: (to: Bucket) => void
   onSaveNotes: (notes: string) => void
   onSetTags: (tags: string[]) => void
+  onSetPriority: (priority: Priority) => void
   onTagClick: (tag: string) => void
   onTrash: () => void
   onRestore: () => void
@@ -27,6 +38,7 @@ export default function ItemCard({
   onMove,
   onSaveNotes,
   onSetTags,
+  onSetPriority,
   onTagClick,
   onTrash,
   onRestore,
@@ -38,6 +50,7 @@ export default function ItemCard({
   const overdue = isOverdue(item)
   const trashed = Boolean(item.deleted_at)
   const tags = item.tags ?? []
+  const priority = (item.priority ?? NORMAL) as Priority
 
   function addTag(raw: string) {
     const tag = normalizeTag(raw)
@@ -49,9 +62,19 @@ export default function ItemCard({
   const unused = suggestions.filter((t) => !tags.includes(t)).slice(0, 6)
 
   return (
-    <div className={`card${overdue ? ' overdue' : ''}${trashed ? ' trashed' : ''}`}>
+    <div
+      className={`card p${priority}${overdue ? ' overdue' : ''}${trashed ? ' trashed' : ''}`}
+    >
       <button className="card-body" onClick={() => setOpen(!open)}>
-        <div className="card-title">{item.title}</div>
+        <div className="card-title">
+          {/* Normal is the default — only the exceptions earn a marker. */}
+          {priority !== NORMAL && (
+            <span className="priority-dot" title={PRIORITY_LABELS[priority]}>
+              {PRIORITY_EMOJI[priority]}
+            </span>
+          )}
+          {item.title}
+        </div>
         <div className="card-meta">
           <span>{age(item.created_at)}</span>
           {item.bucket === 'standing_by' && item.waiting_on && (
@@ -104,6 +127,19 @@ export default function ItemCard({
             </div>
           ) : (
             <>
+              <div className="priority-row">
+                {PRIORITIES.map((p) => (
+                  <button
+                    key={p}
+                    className={p === priority ? 'prio-btn active' : 'prio-btn'}
+                    aria-pressed={p === priority}
+                    onClick={() => onSetPriority(p)}
+                  >
+                    {PRIORITY_EMOJI[p]} {PRIORITY_LABELS[p]}
+                  </button>
+                ))}
+              </div>
+
               <textarea
                 placeholder="Notes…"
                 value={notes}

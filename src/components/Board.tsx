@@ -8,8 +8,10 @@ import {
   loadSnapshot,
   saveSnapshot,
 } from '../lib/offline'
-import type { Bucket, Item, Tab } from '../types'
+import type { Bucket, Item, Priority, Tab } from '../types'
 import {
+  HIGH,
+  NORMAL,
   TABS,
   TAB_EMOJI,
   TAB_LABELS,
@@ -151,6 +153,11 @@ export default function Board({ session }: Props) {
     await patchItem(item, { tags, updated_at: new Date().toISOString() }, 'Tag')
   }
 
+  async function setPriority(item: Item, priority: Priority) {
+    if (!requireOnline('Setting priority')) return
+    await patchItem(item, { priority, updated_at: new Date().toISOString() }, 'Priority')
+  }
+
   /** Soft delete — the row and its history stay, it just moves to Trash. */
   async function trashItem(item: Item) {
     if (!requireOnline('Deleting')) return
@@ -218,6 +225,11 @@ export default function Board({ session }: Props) {
         return (a.chase_by ?? '9999') < (b.chase_by ?? '9999') ? -1 : 1
       })
     }
+    // Priority floats to the top of every bucket. Sort is stable, so whatever
+    // order the rules above left (or created_at desc) survives as the tiebreak.
+    if (tab !== 'trash') {
+      list = [...list].sort((a, b) => (b.priority ?? NORMAL) - (a.priority ?? NORMAL))
+    }
     return list
   }, [items, live, tab, search, tagFilter])
 
@@ -233,6 +245,11 @@ export default function Board({ session }: Props) {
 
   const overdueCount = useMemo(() => live.filter((i) => isOverdue(i)).length, [live])
 
+  const highCount = useMemo(
+    () => live.filter((i) => i.priority === HIGH && i.bucket !== 'closed').length,
+    [live],
+  )
+
   return (
     <div className="board">
       <header>
@@ -243,9 +260,11 @@ export default function Board({ session }: Props) {
           <span className="hello-sub">
             {overdueCount > 0
               ? `⏳ ${overdueCount} overdue`
-              : counts.in_hand > 0
-                ? `⚡ ${counts.in_hand} in hand`
-                : '✨ all clear'}
+              : highCount > 0
+                ? `🔴 ${highCount} high priority`
+                : counts.in_hand > 0
+                  ? `⚡ ${counts.in_hand} in hand`
+                  : '✨ all clear'}
           </span>
         </div>
         {!online && <span className="pill offline-pill">offline</span>}
@@ -331,6 +350,7 @@ export default function Board({ session }: Props) {
             onMove={(to) => (to === 'standing_by' ? setMoving(item) : moveItem(item, to))}
             onSaveNotes={(notes) => saveNotes(item, notes)}
             onSetTags={(tags) => setTags(item, tags)}
+            onSetPriority={(p) => setPriority(item, p)}
             onTagClick={(t) => setTagFilter(t === tagFilter ? null : normalizeTag(t))}
             onTrash={() => trashItem(item)}
             onRestore={() => restoreItem(item)}

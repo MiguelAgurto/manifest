@@ -347,9 +347,46 @@ header {
   overflow: hidden;
 }
 
+/* High and low get an edge stripe; normal stays quiet. Overdue outranks both. */
+.card.p2 {
+  box-shadow: inset 3px 0 0 var(--danger);
+}
+
+.card.p0 {
+  opacity: 0.82;
+}
+
 .card.overdue {
   border-color: var(--danger);
   box-shadow: inset 3px 0 0 var(--danger);
+}
+
+.priority-dot {
+  font-size: 11px;
+  margin-right: 6px;
+  vertical-align: 1px;
+}
+
+.priority-row {
+  display: flex;
+  gap: 6px;
+}
+
+.prio-btn {
+  flex: 1;
+  font-size: 12.5px;
+  padding: 7px 6px;
+  color: var(--muted);
+  background: var(--surface-2);
+  border-color: var(--border-soft);
+  white-space: nowrap;
+}
+
+.prio-btn.active {
+  color: var(--text);
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  font-weight: 600;
 }
 
 .card.trashed {

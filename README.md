@@ -18,6 +18,18 @@ Phone-first, installable as a PWA, and usable with no signal.
 their original bucket, so restoring puts them back where they were. Purging from
 Trash is the only real delete in the app.
 
+## Priority
+
+Orthogonal to bucket: 🔴 High, ⚪ Normal (the default), 🔵 Low — set from the
+expanded card. High and low carry a marker on the card; normal stays unmarked so
+only the exceptions draw the eye. Priority floats items to the top of whatever
+bucket they're in, ahead of the existing ordering, and the header counts
+outstanding high-priority items once nothing is overdue.
+
+For *when* rather than *how urgent* — this voyage vs the next — use `Parked` for
+things that can wait, or tags like `#nextvoyage` to mark items that stay in play
+but only matter later.
+
 ## Tags
 
 Free-form tags live in a `text[]` column on the item (normalized lowercase, no
@@ -39,7 +51,8 @@ and tapping one filters the board.
 
 `items` — one row per item: `title`, `notes`, `bucket`
 (`inbound | in_hand | standing_by | parked | closed`), `waiting_on`,
-`chase_by`, `tags`, timestamps, `deleted_at`. Deleting is an update that stamps
+`chase_by`, `tags`, `priority` (2 high / 1 normal / 0 low), timestamps,
+`deleted_at`. Deleting is an update that stamps
 `deleted_at`; a hard delete only happens on an explicit purge from Trash, which
 cascades that item's events out with it.
 

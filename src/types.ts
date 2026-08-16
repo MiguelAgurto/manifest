@@ -3,6 +3,28 @@ export type Bucket = 'inbound' | 'in_hand' | 'standing_by' | 'parked' | 'closed'
 /** Trash isn't a bucket — it's a view of items with deleted_at set. */
 export type Tab = Bucket | 'trash'
 
+/** Orthogonal to bucket. Numeric so it sorts without a lookup. */
+export type Priority = 0 | 1 | 2
+
+export const HIGH: Priority = 2
+export const NORMAL: Priority = 1
+export const LOW: Priority = 0
+
+/** High first — the order the picker and the board both use. */
+export const PRIORITIES: Priority[] = [HIGH, NORMAL, LOW]
+
+export const PRIORITY_LABELS: Record<Priority, string> = {
+  2: 'High',
+  1: 'Normal',
+  0: 'Low',
+}
+
+export const PRIORITY_EMOJI: Record<Priority, string> = {
+  2: '🔴',
+  1: '⚪',
+  0: '🔵',
+}
+
 export interface Item {
   id: string
   title: string
@@ -11,6 +33,7 @@ export interface Item {
   waiting_on: string | null
   chase_by: string | null
   tags: string[]
+  priority: Priority
   created_at: string
   updated_at: string
   closed_at: string | null
