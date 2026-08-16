@@ -1,4 +1,6 @@
 import { useState } from 'react'
+import SwipeRow from './SwipeRow'
+import type { Side } from './SwipeRow'
 import type { Bucket, Item, Priority } from '../types'
 import {
   BUCKETS,
@@ -27,9 +29,12 @@ interface Props {
   onSetTags: (tags: string[]) => void
   onSetPriority: (priority: Priority) => void
   onTagClick: (tag: string) => void
+  onTogglePin: () => void
   onTrash: () => void
   onRestore: () => void
   onPurge: () => void
+  swiped: Side
+  onSwipe: (side: Side) => void
 }
 
 export default function ItemCard({
@@ -40,9 +45,12 @@ export default function ItemCard({
   onSetTags,
   onSetPriority,
   onTagClick,
+  onTogglePin,
   onTrash,
   onRestore,
   onPurge,
+  swiped,
+  onSwipe,
 }: Props) {
   const [open, setOpen] = useState(false)
   const [notes, setNotes] = useState(item.notes ?? '')
@@ -60,13 +68,27 @@ export default function ItemCard({
   }
 
   const unused = suggestions.filter((t) => !tags.includes(t)).slice(0, 6)
+  const pinned = Boolean(item.pinned)
 
-  return (
+  /** Run a swipe action and let the row slide shut behind it. */
+  const act = (fn: () => void) => () => {
+    onSwipe(null)
+    fn()
+  }
+
+  // Closed and trashed items can't be pinned, so they only swipe one way.
+  const canPin = !trashed && item.bucket !== 'closed'
+  const canClose = !trashed && item.bucket !== 'closed'
+
+  const card = (
     <div
-      className={`card p${priority}${overdue ? ' overdue' : ''}${trashed ? ' trashed' : ''}`}
+      className={`card p${priority}${overdue ? ' overdue' : ''}${trashed ? ' trashed' : ''}${
+        pinned ? ' pinned' : ''
+      }`}
     >
       <button className="card-body" onClick={() => setOpen(!open)}>
         <div className="card-title">
+          {pinned && <span className="pin-star" title="Pinned">⭐</span>}
           {/* Normal is the default — only the exceptions earn a marker. */}
           {priority !== NORMAL && (
             <span className="priority-dot" title={PRIORITY_LABELS[priority]}>
@@ -140,6 +162,17 @@ export default function ItemCard({
                 ))}
               </div>
 
+              {/* Same actions as the swipe gestures, for desktop and a11y. */}
+              {canPin && (
+                <button
+                  className={pinned ? 'pin-btn active' : 'pin-btn'}
+                  aria-pressed={pinned}
+                  onClick={onTogglePin}
+                >
+                  {pinned ? '⭐ Pinned to top — tap to unpin' : '☆ Pin to top'}
+                </button>
+              )}
+
               <textarea
                 placeholder="Notes…"
                 value={notes}
@@ -203,5 +236,47 @@ export default function ItemCard({
         </div>
       )}
     </div>
+  )
+
+  return (
+    <SwipeRow
+      open={swiped}
+      onOpenChange={onSwipe}
+      leftCount={1}
+      rightCount={trashed ? 2 : canClose ? 2 : 1}
+      left={
+        canPin ? (
+          <button className="swipe-action pin" onClick={act(onTogglePin)}>
+            <span>{pinned ? '☆' : '⭐'}</span>
+            {pinned ? 'Unpin' : 'Pin'}
+          </button>
+        ) : undefined
+      }
+      right={
+        trashed ? (
+          <>
+            <button className="swipe-action restore" onClick={act(onRestore)}>
+              <span>↩︎</span>Restore
+            </button>
+            <button className="swipe-action delete" onClick={act(onPurge)}>
+              <span>🗑️</span>Delete
+            </button>
+          </>
+        ) : (
+          <>
+            {canClose && (
+              <button className="swipe-action done" onClick={act(() => onMove('closed'))}>
+                <span>✅</span>Done
+              </button>
+            )}
+            <button className="swipe-action delete" onClick={act(onTrash)}>
+              <span>🗑️</span>Delete
+            </button>
+          </>
+        )
+      }
+    >
+      {card}
+    </SwipeRow>
   )
 }

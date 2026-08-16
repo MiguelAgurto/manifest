@@ -338,13 +338,110 @@ header {
   flex-wrap: wrap;
 }
 
+/* Swipe rows — actions sit behind the card and are revealed by dragging it. */
+.swipe {
+  position: relative;
+  border-radius: var(--radius);
+  overflow: hidden;
+  margin-bottom: 8px;
+}
+
+.swipe-actions {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  display: flex;
+}
+
+.swipe-left {
+  left: 0;
+}
+
+.swipe-right {
+  right: 0;
+}
+
+.swipe-action {
+  width: 82px; /* keep in step with ACTION_W in SwipeRow.tsx */
+  border: none;
+  border-radius: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #fff;
+  padding: 0;
+}
+
+.swipe-action span {
+  font-size: 17px;
+  line-height: 1;
+}
+
+.swipe-action.pin {
+  background: #b08400;
+}
+
+.swipe-action.done {
+  background: #1f8f6b;
+}
+
+.swipe-action.restore {
+  background: var(--surface-3);
+  color: var(--text);
+}
+
+.swipe-action.delete {
+  background: #b3323f;
+}
+
+.swipe-fg {
+  position: relative;
+  /* Claim horizontal drags, leave vertical scrolling to the browser. */
+  touch-action: pan-y;
+  transition: transform 0.18s ease;
+  will-change: transform;
+}
+
+.swipe-fg.dragging {
+  transition: none;
+}
+
 /* Cards */
 .card {
   background: var(--surface);
   border: 1px solid var(--border-soft);
   border-radius: var(--radius);
-  margin-bottom: 8px;
   overflow: hidden;
+}
+
+.card.pinned {
+  border-color: #6b5300;
+  background: linear-gradient(var(--surface), var(--surface)) padding-box;
+}
+
+.pin-star {
+  font-size: 11px;
+  margin-right: 5px;
+  vertical-align: 1px;
+}
+
+.pin-btn {
+  font-size: 13px;
+  padding: 8px 10px;
+  color: var(--muted);
+  background: var(--surface-2);
+  border-color: var(--border-soft);
+}
+
+.pin-btn.active {
+  color: #ffd479;
+  background: rgba(176, 132, 0, 0.16);
+  border-color: #6b5300;
+  font-weight: 600;
 }
 
 /* High and low get an edge stripe; normal stays quiet. Overdue outranks both. */
@@ -442,10 +539,12 @@ header {
   text-overflow: ellipsis;
 }
 
+/* Queued captures aren't swipeable, so they carry their own gap. */
 .queued-card {
   opacity: 0.65;
   border-style: dashed;
   padding: 12px 14px;
+  margin-bottom: 8px;
 }
 
 .card-actions {

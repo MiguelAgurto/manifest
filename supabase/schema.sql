@@ -11,6 +11,7 @@ create table if not exists items (
   tags        text[] not null default '{}',
   priority    smallint not null default 1     -- 2 high, 1 normal, 0 low
               check (priority between 0 and 2),
+  pinned      boolean not null default false,  -- sorts above everything; cleared on close/trash
   created_at  timestamptz not null default now(),
   updated_at  timestamptz not null default now(),
   closed_at   timestamptz,
@@ -32,6 +33,7 @@ create index if not exists items_bucket_idx on items (bucket);
 create index if not exists items_tags_idx on items using gin (tags);
 create index if not exists items_deleted_at_idx on items (deleted_at);
 create index if not exists items_priority_idx on items (priority);
+create index if not exists items_pinned_idx on items (pinned) where pinned;
 create index if not exists item_events_item_idx on item_events (item_id);
 
 alter table items enable row level security;

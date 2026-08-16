@@ -21,6 +21,7 @@ import {
 } from '../types'
 import ItemCard from './ItemCard'
 import MoveSheet from './MoveSheet'
+import type { Side } from './SwipeRow'
 
 function greeting(date = new Date()): string {
   const h = date.getHours()
@@ -42,6 +43,7 @@ export default function Board({ session }: Props) {
   const [search, setSearch] = useState('')
   const [tagFilter, setTagFilter] = useState<string | null>(null)
   const [moving, setMoving] = useState<Item | null>(null) // item picking a standing_by target
+  const [swiped, setSwiped] = useState<{ id: string; side: Side } | null>(null)
 
   const name = displayName(session.user.email, session.user.user_metadata?.name)
 
@@ -131,6 +133,8 @@ export default function Board({ session }: Props) {
       waiting_on: to === 'standing_by' ? (extra.waiting_on ?? null) : null,
       chase_by: to === 'standing_by' ? (extra.chase_by ?? null) : null,
       closed_at: to === 'closed' ? now : null,
+      // A pin is about what needs attention now — closing settles that.
+      pinned: to === 'closed' ? false : item.pinned,
       updated_at: now,
     }
     if (!(await patchItem(item, patch, 'Move'))) return
@@ -158,12 +162,25 @@ export default function Board({ session }: Props) {
     await patchItem(item, { priority, updated_at: new Date().toISOString() }, 'Priority')
   }
 
+  async function togglePin(item: Item) {
+    if (!requireOnline('Pinning')) return
+    await patchItem(
+      item,
+      { pinned: !item.pinned, updated_at: new Date().toISOString() },
+      'Pin',
+    )
+  }
+
   /** Soft delete — the row and its history stay, it just moves to Trash. */
   async function trashItem(item: Item) {
     if (!requireOnline('Deleting')) return
     await patchItem(
       item,
-      { deleted_at: new Date().toISOString(), updated_at: new Date().toISOString() },
+      {
+        deleted_at: new Date().toISOString(),
+        pinned: false,
+        updated_at: new Date().toISOString(),
+      },
       'Delete',
     )
   }
@@ -225,10 +242,14 @@ export default function Board({ session }: Props) {
         return (a.chase_by ?? '9999') < (b.chase_by ?? '9999') ? -1 : 1
       })
     }
-    // Priority floats to the top of every bucket. Sort is stable, so whatever
-    // order the rules above left (or created_at desc) survives as the tiebreak.
+    // Pins, then priority, float to the top of every bucket. Sort is stable, so
+    // whatever order the rules above left (or created_at desc) is the tiebreak.
     if (tab !== 'trash') {
-      list = [...list].sort((a, b) => (b.priority ?? NORMAL) - (a.priority ?? NORMAL))
+      list = [...list].sort(
+        (a, b) =>
+          Number(Boolean(b.pinned)) - Number(Boolean(a.pinned)) ||
+          (b.priority ?? NORMAL) - (a.priority ?? NORMAL),
+      )
     }
     return list
   }, [items, live, tab, search, tagFilter])
@@ -351,6 +372,9 @@ export default function Board({ session }: Props) {
             onSaveNotes={(notes) => saveNotes(item, notes)}
             onSetTags={(tags) => setTags(item, tags)}
             onSetPriority={(p) => setPriority(item, p)}
+            onTogglePin={() => togglePin(item)}
+            swiped={swiped?.id === item.id ? swiped.side : null}
+            onSwipe={(side) => setSwiped(side ? { id: item.id, side } : null)}
             onTagClick={(t) => setTagFilter(t === tagFilter ? null : normalizeTag(t))}
             onTrash={() => trashItem(item)}
             onRestore={() => restoreItem(item)}

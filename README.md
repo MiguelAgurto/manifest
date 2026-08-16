@@ -18,6 +18,26 @@ Phone-first, installable as a PWA, and usable with no signal.
 their original bucket, so restoring puts them back where they were. Purging from
 Trash is the only real delete in the app.
 
+## Gestures
+
+On a card:
+
+- **Swipe right** → ⭐ Pin / Unpin
+- **Swipe left** → ✅ Done and 🗑️ Delete (↩︎ Restore and 🗑️ Delete in Trash)
+- **Tap** → expand for notes, tags, priority, pin and the full set of moves
+
+Swipes are a shortcut, never the only way: every gesture action also exists as a
+button in the expanded card, so the app stays usable with a mouse or a screen
+reader. A gesture is only claimed once it's clearly horizontal, so vertical
+scrolling is unaffected, and only one row sits open at a time.
+
+## Pin
+
+A pin says "keep this in my face right now", independent of how important the
+item is — pinned items sort above everything, including overdue ones, and carry
+a ⭐. Closing or deleting an item clears its pin, so a pin can't go stale. Closed
+and trashed items can't be pinned.
+
 ## Priority
 
 Orthogonal to bucket: 🔴 High, ⚪ Normal (the default), 🔵 Low — set from the
@@ -51,7 +71,7 @@ and tapping one filters the board.
 
 `items` — one row per item: `title`, `notes`, `bucket`
 (`inbound | in_hand | standing_by | parked | closed`), `waiting_on`,
-`chase_by`, `tags`, `priority` (2 high / 1 normal / 0 low), timestamps,
+`chase_by`, `tags`, `priority` (2 high / 1 normal / 0 low), `pinned`, timestamps,
 `deleted_at`. Deleting is an update that stamps
 `deleted_at`; a hard delete only happens on an explicit purge from Trash, which
 cascades that item's events out with it.

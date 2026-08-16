@@ -34,6 +34,7 @@ export interface Item {
   chase_by: string | null
   tags: string[]
   priority: Priority
+  pinned: boolean
   created_at: string
   updated_at: string
   closed_at: string | null
