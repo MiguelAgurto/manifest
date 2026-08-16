@@ -398,12 +398,29 @@ header {
   background: #b3323f;
 }
 
+.swipe-fg,
+.swipe-fg * {
+  /* Claim horizontal drags, leave vertical scrolling to the browser. Set on
+     descendants too, since the touch lands on the card body, not this node. */
+  touch-action: pan-y;
+}
+
 .swipe-fg {
   position: relative;
-  /* Claim horizontal drags, leave vertical scrolling to the browser. */
-  touch-action: pan-y;
   transition: transform 0.18s ease;
   will-change: transform;
+  /* Stops a drag turning into a text selection or an iOS long-press callout. */
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+
+/* …but the notes box and tag input still need normal text interaction. */
+.swipe-fg textarea,
+.swipe-fg input {
+  touch-action: auto;
+  user-select: text;
+  -webkit-user-select: text;
 }
 
 .swipe-fg.dragging {

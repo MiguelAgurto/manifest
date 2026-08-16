@@ -46,16 +46,25 @@ export default function SwipeRow({
   const start = useRef({ x: 0, y: 0, base: 0 })
   const axis = useRef<'x' | 'y' | null>(null)
   const moved = useRef(false)
+  /** Id of the pointer currently held down, or null. Guards against hover. */
+  const active = useRef<number | null>(null)
 
   function onPointerDown(e: ReactPointerEvent<HTMLDivElement>) {
     if (e.pointerType === 'mouse' && e.button !== 0) return
+    active.current = e.pointerId
     start.current = { x: e.clientX, y: e.clientY, base: openX }
     axis.current = null
     moved.current = false
   }
 
   function onPointerMove(e: ReactPointerEvent<HTMLDivElement>) {
-    if (!e.isPrimary) return
+    // pointermove also fires on hover — without a pointer held down there is
+    // no drag, and acting on it makes the row chase the cursor after a click.
+    if (active.current !== e.pointerId) return
+    if (e.pointerType === 'mouse' && e.buttons === 0) {
+      active.current = null
+      return
+    }
     const dx = e.clientX - start.current.x
     const dy = e.clientY - start.current.y
 
@@ -73,7 +82,9 @@ export default function SwipeRow({
     setDragX(next)
   }
 
-  function onPointerUp() {
+  function onPointerUp(e: ReactPointerEvent<HTMLDivElement>) {
+    if (active.current !== e.pointerId) return
+    active.current = null
     const x = dragX
     setDragX(null)
     if (axis.current !== 'x' || x === null) return
